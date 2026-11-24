@@ -50,7 +50,7 @@ svg { flex: none; }
 .shead { padding-block: 10px 4px; }
 .eyebrow { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .shead h2 { margin: 2px 0 0; font-size: 24px; line-height: 30px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
-.chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.chips { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .chip { height: 26px; padding: 0 10px; border-radius: 8px; background: var(--s2); border: 1px solid var(--line2); font-size: 12px;
   font-weight: 600; display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
 .chip svg { color: var(--muted); }
@@ -69,6 +69,15 @@ svg { flex: none; }
 .ex { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px; margin-left: -8px; border: 0; border-radius: 12px;
   background: none; text-align: left; }
 .ex:hover { background: var(--s1); }
+.ex { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
+.ex img { pointer-events: none; }
+.steps li.on .ex { background: var(--sel-bg); box-shadow: inset 0 0 0 1px var(--sel-line); }
+.steps li.on .nm b { color: var(--sel-ink); }
+.ph .ok { position: absolute; right: 4px; bottom: 4px; width: 22px; height: 22px; border-radius: 11px; background: var(--accent);
+  color: var(--on-accent); display: none; align-items: center; justify-content: center; }
+.steps li.on .ph .ok { display: flex; }
+.clr { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--line2); background: none; font-size: 12px;
+  font-weight: 600; color: var(--muted); }
 .ph { position: relative; flex: none; width: 88px; height: 66px; border-radius: 10px; overflow: hidden; background: var(--s2);
   border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--faint); }
 .ph img { width: 100%; height: 100%; object-fit: cover; background: var(--photo-bg); }
@@ -134,7 +143,7 @@ svg { flex: none; }
     <div class="chiprow" id="chips" role="toolbar" aria-label="Sesión"></div>
   </header>
   <main id="main"></main>
-  <p class="credit">Fotos de <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a>
+  <p class="credit">Mantén pulsado un ejercicio para marcarlo; las marcas se borran al día siguiente.<br>Fotos de <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a>
     (dominio público), solo donde el movimiento coincide. ▶ abre el ejercicio en YouTube.</p>
 </div>
 <nav class="tabbar" aria-label="Secciones"><div class="in" id="tabs"></div></nav>
@@ -162,7 +171,7 @@ const P = {
   person: '<circle cx="12" cy="5.5" r="2.2"/><path d="M12 8.5v6.5M8.5 21l3.5-6 3.5 6M7 11.5l5-2 5 2"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
   note: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
-  chev: '<path d="M6 9l6 6 6-6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
 };
 const YT = ic('<rect x="2.5" y="5" width="19" height="14" rx="4"/><path d="M10.2 9.3v5.4l4.6-2.7z"/>');   // outline, like the tab icons
 const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -170,16 +179,25 @@ const fecha = d => { const [y, m, dd] = d.split('-').map(Number); return `${dd} 
 const video = e => e.video || 'https://www.youtube.com/results?search_query=' + encodeURIComponent(e.nombre + ' ejercicio');
 const foto = (e, i = 0) => e.foto ? `img/${e.foto}/${i}.jpg` : '';
 
-const st = { r: '', sec: 0, ses: {}, warm: false };
+const st = { r: '', sec: 0, ses: {}, warm: false, marcas: null };
 try { Object.assign(st, JSON.parse(localStorage.getItem('rutinas-estado') || '{}')); } catch (e) {}
 const save = () => { try { localStorage.setItem('rutinas-estado', JSON.stringify(st)); } catch (e) {} };
 const EX = new Map();
+let SK = '';                                   // current session: "<desde>/<section>/<session>"
+
+// Marked rows ({"<SK>/<row key>": 1}), kept for the day only so each workout starts clean.
+const hoy = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+function marks() {
+  if (!st.marcas || st.marcas.dia !== hoy() || typeof st.marcas.k !== 'object') st.marcas = { dia: hoy(), k: {} };
+  return st.marcas.k;
+}
+const label = (e, on) => `${e.nombre}: ${e.series}${on ? ' (marcado)' : ''}. Ver fotos y nota`;
 
 function row(e, key, small) {
   EX.set(key, e);
-  const pic = foto(e);
-  return `<li><button class="ex" data-ex="${key}" aria-label="${esc(e.nombre)}: ${esc(e.series)}. Ver fotos y nota">
-      <span class="ph">${pic ? `<img loading="lazy" src="${pic}" alt="">` : ic(P.person, small ? 20 : 26, 1.5)}${e.num ? `<span class="k">${esc(e.num)}</span>` : ''}</span>
+  const pic = foto(e), on = !!marks()[`${SK}/${key}`];
+  return `<li${on ? ' class="on"' : ''}><button class="ex" data-ex="${key}" aria-label="${esc(label(e, on))}">
+      <span class="ph">${pic ? `<img loading="lazy" src="${pic}" alt="" draggable="false">` : ic(P.person, small ? 20 : 26, 1.5)}${e.num ? `<span class="k">${esc(e.num)}</span>` : ''}<span class="ok">${ic(P.check, 14, 3)}</span></span>
       <span class="nm"><b>${esc(e.nombre)}</b>${e.detalle ? `<span class="d">${esc(e.detalle)}</span>` : ''}<span class="s">${esc(e.series)}</span></span>
     </button><a class="yt" href="${esc(video(e))}" target="_blank" rel="noopener" aria-label="${esc(e.nombre)} en YouTube">${YT}</a></li>`;
 }
@@ -194,6 +212,7 @@ function render() {
   const xi = Math.min(st.ses[k] || 0, sec.sesiones.length - 1);
   const s = sec.sesiones[xi];
   EX.clear();
+  SK = `${R.desde}/${si}/${xi}`;
   $('#ver').innerHTML = RS.length > 1
     ? `<select id="ver-sel" aria-label="Versión de la rutina">${RS.map(r => `<option value="${esc(r.desde)}"${r === R ? ' selected' : ''}>${esc(r.titulo)} · ${fecha(r.desde)}</option>`).join('')}</select>`
     : `<span class="ver">${esc(R.titulo)} · desde ${fecha(R.desde)}</span>`;
@@ -201,17 +220,37 @@ function render() {
     `<button class="pill" data-s="${i}" aria-pressed="${i === xi}">${esc(x.nombre)}</button>`).join('') : '';
   $('#chips').hidden = sec.sesiones.length < 2;
   let h = `<section class="shead"><div class="eyebrow">${esc(sec.nombre)} · ${esc(s.nombre)}</div><h2>${esc(s.titulo || s.nombre)}</h2>
-    <div class="chips">${s.duracion ? `<span class="chip">${ic(P.clock, 14, 2)}${esc(s.duracion)}</span>` : ''}<span class="chip">${s.ejercicios.length} ejercicios</span></div></section>`;
+    <div class="chips">${s.duracion ? `<span class="chip">${ic(P.clock, 14, 2)}${esc(s.duracion)}</span>` : ''}<span class="chip">${s.ejercicios.length} ejercicios</span>
+    <span class="chip" id="mk" hidden></span><button class="clr" id="clr" hidden>Quitar marcas</button></div></section>`;
   const w = R.calentamiento;
   if (sec.calentamiento && w && w.ejercicios && w.ejercicios.length) {
     h += `<div class="warm"><button id="warm-t" aria-expanded="${st.warm}" aria-controls="warm-l"><b>${esc(w.titulo || 'Calentamiento')}</b>
       <span>${[w.duracion, `${w.ejercicios.length} ejercicios`, w.nota].filter(Boolean).map(esc).join(' · ')}</span>${ic(P.chev, 20)}</button>
       <ol class="steps" id="warm-l"${st.warm ? '' : ' hidden'}>${w.ejercicios.map((e, i) => row(e, `w${i}`, true)).join('')}</ol></div>`;
   }
-  h += `<h3 class="grp">Ejercicios</h3><ol class="steps">${s.ejercicios.map((e, i) => row(e, `e${i}`)).join('')}</ol>`;
+  h += `<h3 class="grp">Ejercicios</h3><ol class="steps" id="ex-l">${s.ejercicios.map((e, i) => row(e, `e${i}`)).join('')}</ol>`;
   $('#main').innerHTML = h;
   $('#tabs').innerHTML = secs.map((t, i) => `<button data-t="${i}"${i === si ? ' aria-current="page"' : ''}><span>${ic(P[t.icono] || P.lista)}</span>${esc(t.nombre)}</button>`).join('');
   document.querySelector('.tabbar').hidden = secs.length < 2;
+  updateMarks();
+}
+
+function updateMarks() {
+  const list = $('#ex-l'), any = $('#main').querySelectorAll('li.on').length;
+  const n = list ? list.querySelectorAll('li.on').length : 0, tot = list ? list.children.length : 0;
+  $('#mk').textContent = `${n} de ${tot} marcados`;
+  $('#mk').hidden = !n;
+  $('#clr').hidden = !any;
+}
+
+function toggleMark(b) {
+  const m = marks(), k = `${SK}/${b.dataset.ex}`;
+  if (m[k]) delete m[k]; else m[k] = 1;
+  save();
+  b.closest('li').classList.toggle('on', !!m[k]);
+  b.setAttribute('aria-label', label(EX.get(b.dataset.ex), !!m[k]));
+  try { if (navigator.vibrate) navigator.vibrate(25); } catch (e) {}
+  updateMarks();
 }
 
 let lastFocus = null;
@@ -239,16 +278,39 @@ function closeSheet() {
 
 document.addEventListener('click', ev => {
   const t = ev.target.closest('button, a');
+  if (swallow) { swallow = false; if (t && t.dataset.ex) return; }      // the click that ends a long press
   if (!t) { if (ev.target.id === 'bd') closeSheet(); return; }
   const R = RS.find(r => r.desde === st.r) || RS[0];
   if (t.dataset.t) { st.sec = +t.dataset.t; save(); render(); window.scrollTo(0, 0); }
   else if (t.dataset.s) { st.ses[`${R.desde}/${st.sec || 0}`] = +t.dataset.s; save(); render(); window.scrollTo(0, 0); }
   else if (t.id === 'warm-t') { st.warm = !st.warm; save(); render(); $('#warm-t').focus(); }
+  else if (t.id === 'clr') { const m = marks(); Object.keys(m).forEach(k => { if (k.startsWith(SK + '/')) delete m[k]; }); save(); render(); }
   else if (t.dataset.ex) openSheet(EX.get(t.dataset.ex));
   else if (t.id === 'sh-x') closeSheet();
 });
 document.addEventListener('change', ev => {
   if (ev.target.id === 'ver-sel') { st.r = ev.target.value; st.sec = 0; save(); render(); window.scrollTo(0, 0); }
+});
+// Long press (0.45 s) on a row marks or unmarks it; a short tap still opens the photos. Moving the finger
+// (scrolling) cancels it. Android's own long-press "contextmenu" is suppressed on rows and also counts as a long press.
+let press = null, swallow = false;
+function firePress(p) { p.fired = true; swallow = true; toggleMark(p.b); }
+document.addEventListener('pointerdown', ev => {
+  swallow = false; press = null;
+  const b = ev.target.closest && ev.target.closest('.ex');
+  if (!b || ev.button > 0) return;
+  const p = press = { b, x: ev.clientX, y: ev.clientY, fired: false, moved: false };
+  p.t = setTimeout(() => { if (press === p && !p.moved) firePress(p); }, 450);
+});
+document.addEventListener('pointermove', ev => {
+  if (press && !press.moved && Math.hypot(ev.clientX - press.x, ev.clientY - press.y) > 10) { press.moved = true; clearTimeout(press.t); }
+});
+['pointerup', 'pointercancel'].forEach(type => document.addEventListener(type, () => { if (press) clearTimeout(press.t); }));
+document.addEventListener('contextmenu', ev => {
+  const b = ev.target.closest && ev.target.closest('.ex');
+  if (!b || !press || press.b !== b) return;
+  ev.preventDefault();
+  if (!press.fired && !press.moved) { clearTimeout(press.t); firePress(press); }
 });
 document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
 $('#sh-x').innerHTML = ic(P.x, 22, 2);
