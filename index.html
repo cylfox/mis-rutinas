@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f1115">
+<title>Rutinas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
+<style>
+/* Same dark phone UI as the workout timer: one 520px column, sticky header with session pills,
+   exercise rows with a catalogue photo, bottom tab bar, bottom sheet with both photos and the note. */
+:root {
+  --bg: #0f1115; --s1: #181b22; --s2: #21252e; --line: #2c313c; --line2: #3a404c; --tabline: #22262f;
+  --fg: #eef0f3; --muted: #aab0bb; --faint: #8b929e; --accent: #8ab0ff; --on-accent: #0c1222;
+  --sel-bg: #1c2538; --sel-line: #5677c0; --sel-ink: #dbe5ff;
+  --photo-bg: #0b0c0f; --badge-bg: rgba(15, 17, 21, .82); --scrim: rgba(5, 6, 8, .74); --grab: #4a505c;
+  --yt: #e0484e; --yt-ink: #ffffff;
+  --note-bg: #182133; --note-line: #2d3c5e; --note-ink: #8ab0ff;
+  --font: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.45 var(--font); -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+a { color: var(--accent); }
+button, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+svg { flex: none; }
+[hidden] { display: none !important; }
+.app { max-width: 520px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 calc(88px + env(safe-area-inset-bottom, 0px)); }
+
+/* header */
+.head { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 4; background: var(--bg); padding-block: 12px 10px; }
+.titlerow { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 32px; }
+.titlerow h1 { margin: 0; font-size: 26px; line-height: 32px; font-weight: 800; letter-spacing: -.02em; }
+.titlerow .ver { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.titlerow select { appearance: none; -webkit-appearance: none; height: 36px; max-width: 60%; padding: 0 30px 0 12px; border-radius: 18px;
+  border: 1px solid var(--line2); background: var(--s1) no-repeat right 10px center / 14px; font-size: 13px; font-weight: 600; color: var(--fg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aab0bb' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E"); }
+.titlerow select option { background: var(--s1); color: var(--fg); }
+.chiprow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; margin-top: 12px; }
+.chiprow::-webkit-scrollbar { display: none; }
+.pill { flex: none; height: 44px; padding: 0 16px; border-radius: 22px; border: 1px solid var(--line2); background: transparent;
+  font-size: 14px; font-weight: 600; }
+.pill[aria-pressed="true"] { border-color: var(--sel-line); background: var(--sel-bg); color: var(--sel-ink); font-weight: 700; }
+
+/* session */
+.shead { padding-block: 10px 4px; }
+.eyebrow { font-size: 12px; line-height: 16px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.shead h2 { margin: 2px 0 0; font-size: 24px; line-height: 30px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+.chips { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { height: 26px; padding: 0 10px; border-radius: 8px; background: var(--s2); border: 1px solid var(--line2); font-size: 12px;
+  font-weight: 600; display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
+.chip svg { color: var(--muted); }
+.grp { margin: 14px 0 2px; font-size: 11px; line-height: 18px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.warm { margin-top: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--s1); }
+.warm > button { width: 100%; min-height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 14px; border: 0; background: none; text-align: left; }
+.warm > button b { font-size: 15px; font-weight: 700; }
+.warm > button span { flex: 1; font-size: 13px; color: var(--muted); }
+.warm > button svg { color: var(--muted); transition: transform .15s; }
+.warm > button[aria-expanded="true"] svg { transform: rotate(180deg); }
+.warm .steps { padding: 0 6px 6px 8px; }
+
+/* exercise rows */
+.steps { list-style: none; margin: 0; padding: 0; }
+.steps li { display: flex; align-items: center; gap: 4px; }
+.ex { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 8px; margin-left: -8px; border: 0; border-radius: 12px;
+  background: none; text-align: left; }
+.ex:hover { background: var(--s1); }
+.ph { position: relative; flex: none; width: 88px; height: 66px; border-radius: 10px; overflow: hidden; background: var(--s2);
+  border: 1px solid var(--line); display: flex; align-items: center; justify-content: center; color: var(--faint); }
+.ph img { width: 100%; height: 100%; object-fit: cover; background: var(--photo-bg); }
+.ph .k { position: absolute; left: 4px; top: 4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 6px; background: var(--badge-bg);
+  color: var(--fg); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; }
+.warm .ph { width: 64px; height: 48px; }
+.nm { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nm b { font-size: 15px; line-height: 20px; font-weight: 600; }
+.nm .d { font-size: 12px; line-height: 16px; color: var(--muted); }
+.nm .s { margin-top: 2px; font-size: 14px; line-height: 18px; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+.yt { flex: none; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 10px; }
+.yt:hover { background: var(--s1); }
+.yt .bg, .ytpill .bg { fill: var(--yt); } .yt .fg, .ytpill .fg { fill: var(--yt-ink); }
+.empty { padding: 32px 0; color: var(--muted); }
+.credit { margin-top: 20px; color: var(--faint); font-size: 12px; line-height: 17px; }
+.credit a { color: var(--muted); }
+
+/* tab bar */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; background: var(--bg); border-top: 1px solid var(--tabline);
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tabbar .in { max-width: 520px; margin: 0 auto; height: 64px; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.tabbar button { border: 0; background: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
+.tabbar button span { width: 56px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+.tabbar button[aria-current="page"] { color: var(--accent); font-weight: 700; }
+.tabbar button[aria-current="page"] span { background: var(--sel-bg); }
+
+/* photo sheet */
+.backdrop { position: fixed; inset: 0; z-index: 8; background: var(--scrim); }
+.sheet { position: fixed; z-index: 9; left: 0; right: 0; bottom: 0; max-height: 92%; max-width: 520px; margin: 0 auto; background: var(--s1);
+  border-radius: 22px 22px 0 0; border-top: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden;
+  padding-bottom: env(safe-area-inset-bottom, 0px); }
+.grab { flex: none; display: flex; justify-content: center; padding-top: 8px; }
+.grab i { width: 40px; height: 5px; border-radius: 3px; background: var(--grab); }
+.sheet-head { flex: none; display: flex; align-items: flex-start; gap: 8px; padding: 8px 6px 0 max(16px, env(safe-area-inset-left, 0px)); }
+.sheet-head div { flex: 1; min-width: 0; padding-top: 6px; }
+.sheet-head h2 { margin: 0; font-size: 20px; line-height: 26px; font-weight: 800; text-wrap: balance; }
+.sheet-head p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+.iconbtn { flex: none; width: 44px; height: 44px; border-radius: 22px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; }
+.sheet-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px;
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 18px max(16px, env(safe-area-inset-left, 0px)); }
+.s-row { display: flex; align-items: center; gap: 12px; }
+.big-s { flex: 1; min-width: 0; font-size: 22px; line-height: 28px; font-weight: 800; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ytpill { flex: none; height: 44px; padding: 0 14px 0 8px; border-radius: 22px; border: 1px solid var(--line2); display: flex; align-items: center;
+  gap: 6px; color: var(--fg); text-decoration: none; font-size: 14px; font-weight: 700; }
+.pics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pics.one { grid-template-columns: minmax(0, 1fr); }
+.pics img { display: block; width: 100%; max-width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--photo-bg); border-radius: 12px; }
+.nopic { aspect-ratio: 16 / 7; border-radius: 12px; border: 1px dashed var(--line2); display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; color: var(--faint); font-size: 13px; text-align: center; padding: 0 16px; }
+.note { border-radius: 14px; background: var(--note-bg); border: 1px solid var(--note-line); padding: 12px 14px 14px; }
+.note-h { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 16px; font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--note-ink); }
+.note p { margin: 6px 0 0; font-size: 15px; line-height: 22px; color: var(--fg); }
+.note strong { font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .warm > button svg { transition: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="head">
+    <div class="titlerow"><h1>Rutinas</h1><span id="ver"></span></div>
+    <div class="chiprow" id="chips" role="toolbar" aria-label="Sesión"></div>
+  </header>
+  <main id="main"></main>
+  <p class="credit">Fotos de <a href="https://github.com/yuhonas/free-exercise-db" target="_blank" rel="noopener">free-exercise-db</a>
+    (dominio público), solo donde el movimiento coincide. ▶ abre el ejercicio en YouTube.</p>
+</div>
+<nav class="tabbar" aria-label="Secciones"><div class="in" id="tabs"></div></nav>
+<div class="backdrop" id="bd" hidden></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sh-name" hidden>
+  <div class="grab"><i></i></div>
+  <div class="sheet-head"><div><h2 id="sh-name"></h2><p id="sh-d"></p></div>
+    <button class="iconbtn" id="sh-x" aria-label="Cerrar"></button></div>
+  <div class="sheet-body" id="sh-body"></div>
+</div>
+
+<script src="datos.js"></script>
+<script>
+// Data: window.RUTINAS from datos.js (built by web/publicar.py from rutinas/*.json). Format: see CLAUDE.md.
+const RS = (window.RUTINAS || []).slice().sort((a, b) => b.desde.localeCompare(a.desde));
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const md = s => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+const ic = (p, n = 22, w = 1.8) => `<svg width="${n}" height="${n}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+const P = {
+  gimnasio: '<path d="M6.5 7v10M3.5 9.5v5M17.5 7v10M20.5 9.5v5M6.5 12h11"/>',
+  casa: '<path d="M4 11l8-6.5 8 6.5v8.5a.5.5 0 0 1-.5.5H15v-6H9v6H4.5a.5.5 0 0 1-.5-.5z"/>',
+  diario: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
+  lista: '<path d="M9 6.5h11M9 12h11M9 17.5h11M4.5 6.5h.01M4.5 12h.01M4.5 17.5h.01"/>',
+  person: '<circle cx="12" cy="5.5" r="2.2"/><path d="M12 8.5v6.5M8.5 21l3.5-6 3.5 6M7 11.5l5-2 5 2"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  note: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+};
+const YT = `<svg width="30" height="22" viewBox="0 0 30 22" aria-hidden="true"><rect class="bg" x="1" y="1" width="28" height="20" rx="6"/><path class="fg" d="M12 6.5v9l7.5-4.5z"/></svg>`;
+const MES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const fecha = d => { const [y, m, dd] = d.split('-').map(Number); return `${dd} ${MES[m - 1]} ${y}`; };
+const video = e => e.video || 'https://www.youtube.com/results?search_query=' + encodeURIComponent(e.nombre + ' ejercicio');
+const foto = (e, i = 0) => e.foto ? `img/${e.foto}/${i}.jpg` : '';
+
+const st = { r: '', sec: 0, ses: {}, warm: false };
+try { Object.assign(st, JSON.parse(localStorage.getItem('rutinas-estado') || '{}')); } catch (e) {}
+const save = () => { try { localStorage.setItem('rutinas-estado', JSON.stringify(st)); } catch (e) {} };
+const EX = new Map();
+
+function row(e, key, small) {
+  EX.set(key, e);
+  const pic = foto(e);
+  return `<li><button class="ex" data-ex="${key}" aria-label="${esc(e.nombre)}: ${esc(e.series)}. Ver fotos y nota">
+      <span class="ph">${pic ? `<img loading="lazy" src="${pic}" alt="">` : ic(P.person, small ? 20 : 26, 1.5)}${e.num ? `<span class="k">${esc(e.num)}</span>` : ''}</span>
+      <span class="nm"><b>${esc(e.nombre)}</b>${e.detalle ? `<span class="d">${esc(e.detalle)}</span>` : ''}<span class="s">${esc(e.series)}</span></span>
+    </button><a class="yt" href="${esc(video(e))}" target="_blank" rel="noopener" aria-label="${esc(e.nombre)} en YouTube">${YT}</a></li>`;
+}
+
+function render() {
+  if (!RS.length) { $('#main').innerHTML = '<p class="empty">Todavía no hay rutinas publicadas.</p>'; return; }
+  const R = RS.find(r => r.desde === st.r) || RS[0];
+  const secs = R.secciones || [];
+  const si = Math.min(st.sec || 0, secs.length - 1);
+  const sec = secs[si];
+  const k = `${R.desde}/${si}`;
+  const xi = Math.min(st.ses[k] || 0, sec.sesiones.length - 1);
+  const s = sec.sesiones[xi];
+  EX.clear();
+  $('#ver').innerHTML = RS.length > 1
+    ? `<select id="ver-sel" aria-label="Versión de la rutina">${RS.map(r => `<option value="${esc(r.desde)}"${r === R ? ' selected' : ''}>${esc(r.titulo)} · ${fecha(r.desde)}</option>`).join('')}</select>`
+    : `<span class="ver">${esc(R.titulo)} · desde ${fecha(R.desde)}</span>`;
+  $('#chips').innerHTML = sec.sesiones.length > 1 ? sec.sesiones.map((x, i) =>
+    `<button class="pill" data-s="${i}" aria-pressed="${i === xi}">${esc(x.nombre)}</button>`).join('') : '';
+  $('#chips').hidden = sec.sesiones.length < 2;
+  let h = `<section class="shead"><div class="eyebrow">${esc(sec.nombre)} · ${esc(s.nombre)}</div><h2>${esc(s.titulo || s.nombre)}</h2>
+    <div class="chips">${s.duracion ? `<span class="chip">${ic(P.clock, 14, 2)}${esc(s.duracion)}</span>` : ''}<span class="chip">${s.ejercicios.length} ejercicios</span></div></section>`;
+  const w = R.calentamiento;
+  if (sec.calentamiento && w && w.ejercicios && w.ejercicios.length) {
+    h += `<div class="warm"><button id="warm-t" aria-expanded="${st.warm}" aria-controls="warm-l"><b>${esc(w.titulo || 'Calentamiento')}</b>
+      <span>${[w.duracion, `${w.ejercicios.length} ejercicios`, w.nota].filter(Boolean).map(esc).join(' · ')}</span>${ic(P.chev, 20)}</button>
+      <ol class="steps" id="warm-l"${st.warm ? '' : ' hidden'}>${w.ejercicios.map((e, i) => row(e, `w${i}`, true)).join('')}</ol></div>`;
+  }
+  h += `<h3 class="grp">Ejercicios</h3><ol class="steps">${s.ejercicios.map((e, i) => row(e, `e${i}`)).join('')}</ol>`;
+  $('#main').innerHTML = h;
+  $('#tabs').innerHTML = secs.map((t, i) => `<button data-t="${i}"${i === si ? ' aria-current="page"' : ''}><span>${ic(P[t.icono] || P.lista)}</span>${esc(t.nombre)}</button>`).join('');
+  document.querySelector('.tabbar').hidden = secs.length < 2;
+}
+
+let lastFocus = null;
+function openSheet(e) {
+  lastFocus = document.activeElement;
+  $('#sh-name').textContent = e.nombre;
+  $('#sh-d').textContent = e.detalle || '';
+  $('#sh-d').hidden = !e.detalle;
+  const pics = e.foto ? [foto(e, 0), foto(e, 1)] : [];
+  $('#sh-body').innerHTML = `<div class="s-row"><div class="big-s">${esc(e.series)}</div>
+      <a class="ytpill" href="${esc(video(e))}" target="_blank" rel="noopener" aria-label="${esc(e.nombre)} en YouTube">${YT}YouTube</a></div>` +
+    (pics.length ? `<div class="pics">${pics.map((p, i) => `<img src="${p}" alt="${esc(e.nombre)}, posición ${i + 1}">`).join('')}</div>`
+      : `<div class="nopic">${ic(P.person, 32, 1.5)}Sin foto: el catálogo no tiene este movimiento.</div>`) +
+    (e.nota ? `<div class="note" role="note"><div class="note-h">${ic(P.note, 16, 2)}Notas</div><p>${md(e.nota)}</p></div>` : '');
+  $('#sh-body').querySelectorAll('.pics img').forEach(img => img.addEventListener('error', () => {
+    img.remove(); const g = $('#sh-body .pics'); if (g && g.children.length === 1) g.classList.add('one');
+  }));
+  $('#bd').hidden = false; $('#sheet').hidden = false;
+  $('#sh-x').focus();
+}
+function closeSheet() {
+  $('#bd').hidden = true; $('#sheet').hidden = true;
+  if (lastFocus) lastFocus.focus();
+}
+
+document.addEventListener('click', ev => {
+  const t = ev.target.closest('button, a');
+  if (!t) { if (ev.target.id === 'bd') closeSheet(); return; }
+  const R = RS.find(r => r.desde === st.r) || RS[0];
+  if (t.dataset.t) { st.sec = +t.dataset.t; save(); render(); window.scrollTo(0, 0); }
+  else if (t.dataset.s) { st.ses[`${R.desde}/${st.sec || 0}`] = +t.dataset.s; save(); render(); window.scrollTo(0, 0); }
+  else if (t.id === 'warm-t') { st.warm = !st.warm; save(); render(); $('#warm-t').focus(); }
+  else if (t.dataset.ex) openSheet(EX.get(t.dataset.ex));
+  else if (t.id === 'sh-x') closeSheet();
+});
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'ver-sel') { st.r = ev.target.value; st.sec = 0; save(); render(); window.scrollTo(0, 0); }
+});
+document.addEventListener('keydown', ev => { if (ev.key === 'Escape' && !$('#sheet').hidden) closeSheet(); });
+$('#sh-x').innerHTML = ic(P.x, 22, 2);
+render();
+</script>
+</body>
+</html>
